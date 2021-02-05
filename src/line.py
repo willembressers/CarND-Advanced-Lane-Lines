@@ -43,12 +43,15 @@ class Line():
         # Generate x and y values for plotting
         self.ploty = np.linspace(0, height - 1, height)
 
+        # Define y-value where we want radius of curvature
+        self.y_eval = np.max(self.ploty)
+
     def fit_polynomial(self):
         # Fit a second order polynomial
         self.current_fit = np.polyfit(self.ally, self.allx, 2)
         self.detected = True
 
-    def calc_polynomial(self):
+    def calculate_polynomial(self):
         return self.current_fit[0] * self.ploty**2 + self.current_fit[1] * self.ploty + self.current_fit[2]
         
     def color_pixels(self, image, color):
@@ -56,7 +59,12 @@ class Line():
         return image
 
     def generate_polygon_points(self, margin):
-        fitx = self.calc_polynomial()
+        fitx = self.calculate_polynomial()
         line_window1 = np.array([np.transpose(np.vstack([fitx - margin, self.ploty]))])
         line_window2 = np.array([np.flipud(np.transpose(np.vstack([fitx + margin, self.ploty])))])
         return np.hstack((line_window1, line_window2))
+
+    def calculate_curvature(self):
+        # calculation of R_curve (radius of curvature)
+        return ((1 + (2 * self.current_fit[0] * self.y_eval + self.current_fit[1])**2)**1.5) / np.absolute(2 * self.current_fit[0])
+        

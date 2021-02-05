@@ -16,6 +16,7 @@ class Lane():
         self.nwindows = nwindows
         self.margin = margin
         self.minpix = minpix
+        self.ploty = np.linspace(0, height - 1, height)
 
         # initialize the lines
         self.left_line = Line(height)
@@ -146,55 +147,26 @@ class Lane():
         cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
         result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
 
-
         return result
 
+    def draw(self, image, warped, undist, transform):
+        # Create an image to draw the lines on
+        warp_zero = np.zeros_like(warped).astype(np.uint8)
+        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-    # def determine_curvature(self, ploty, left_fit, right_fit):
-    #     """
-    #     Calculates the curvature of polynomial functions in pixels.
+        # Recast the x and y points into usable format for cv2.fillPoly()
+        pts_left = np.array([np.transpose(np.vstack([self.left_line.calculate_polynomial(), self.ploty]))])
+        pts_right = np.array([np.flipud(np.transpose(np.vstack([self.right_line.calculate_polynomial(), self.ploty])))])
+        pts = np.hstack((pts_left, pts_right))
+
+        # Draw the lane onto the warped blank image
+        cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+
+        # Warp the blank back to original image space using inverse perspective matrix (Minv)
+        newwarp = cv2.warpPerspective(color_warp, transform.inverse_matrix, (image.shape[1], image.shape[0])) 
         
-    #     :param A: text
-    #     :param B: text
-    #     :param C: text
-        
-    #     :return: something
-    #     """
-        
-    #     # Define y-value where we want radius of curvature
-    #     # We'll choose the maximum y-value, corresponding to the bottom of the image
-    #     y_eval = np.max(ploty)
-        
-    #     ##### Implement the calculation of R_curve (radius of curvature) #####
-    #     left_A = left_fit[0]
-    #     left_B = left_fit[1]
-    #     left_curverad = ((1 + (2 * left_A * y_eval + left_B)**2)**1.5) / np.absolute(2 * left_A)
-
-    #     right_A = right_fit[0]
-    #     right_B = right_fit[1]
-    #     right_curverad = ((1 + (2 * right_A * y_eval + right_B)**2)**1.5) / np.absolute(2 * right_A)
-        
-    #     return left_curverad, right_curverad
-
-
-    # def draw_lane(self, image, warped):
-    #     # Create an image to draw the lines on
-    #     warp_zero = np.zeros_like(warped).astype(np.uint8)
-    #     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
-
-    #     # Recast the x and y points into usable format for cv2.fillPoly()
-    #     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
-    #     pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
-    #     pts = np.hstack((pts_left, pts_right))
-
-    #     # Draw the lane onto the warped blank image
-    #     cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
-
-    #     # Warp the blank back to original image space using inverse perspective matrix (Minv)
-    #     newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0])) 
-        
-    #     # Combine the result with the original image
-    #     result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
+        # Combine the result with the original image
+        return cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
 
 
     def detect_lines(self, binary_image):

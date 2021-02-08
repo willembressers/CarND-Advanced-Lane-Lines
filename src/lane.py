@@ -11,31 +11,38 @@ from src.line import Line
 class Lane():
 
     def __init__(self, height, nwindows=9, margin=100, minpix=50):
-        logging.debug(f'Initializing the Lane')
+        """
+        Initializes the Lane
+
+        :return: None
+        """
 
         self.nwindows = nwindows
         self.margin = margin
         self.minpix = minpix
         self.ploty = np.linspace(0, height - 1, height)
+        self.ym_per_pix = 30 / 720
+        self.xm_per_pix = 3.7 / 700
 
         # initialize the lines
         self.left_line = Line(height)
         self.right_line = Line(height) 
 
     def sliding_windows(self, binary_image):
-        logging.debug(f'lane => sliding_windows')
+        """
+        Searches for the lane lines by:
+        - take a historgram of all (bottom half) values
+        - calculate the maximum values before (left) the center en after (right) the center
+        - loop over the search windows (which are centered around the maximum histogram values)
+        - identify nonzero pixels
+        - update the window centers for the next itteration
 
-        # Take a histogram of the bottom half of the image
-        histogram = np.sum(binary_image[binary_image.shape[0] // 2:,:], axis=0)
-        
+        :param binary_image: The binary input image
+
+        :return: image
+        """
         # Create an output image to draw on and visualize the result
         out_img = np.dstack((binary_image, binary_image, binary_image))
-
-        # Find the peak of the left and right halves of the histogram
-        # These will be the starting point for the left and right lines
-        midpoint = np.int(histogram.shape[0] // 2)
-        leftx_base = np.argmax(histogram[:midpoint])
-        rightx_base = np.argmax(histogram[midpoint:]) + midpoint    
 
         # Set height of windows - based on nwindows above and image shape
         window_height = np.int(binary_image.shape[0] // self.nwindows)
@@ -44,6 +51,15 @@ class Lane():
         nonzero = binary_image.nonzero()
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
+
+        # Take a histogram of the bottom half of the image
+        histogram = np.sum(binary_image[binary_image.shape[0] // 2:,:], axis=0)
+
+        # Find the peak of the left and right halves of the histogram
+        # These will be the starting point for the left and right lines
+        midpoint = np.int(histogram.shape[0] // 2)
+        leftx_base = np.argmax(histogram[:midpoint])
+        rightx_base = np.argmax(histogram[midpoint:]) + midpoint    
 
         # Current positions to be updated later for each window in nwindows
         leftx_current = leftx_base
@@ -97,8 +113,8 @@ class Lane():
         self.right_line.ally = nonzeroy[right_lane_inds]
 
         # fit polynomals
-        self.left_line.fit_polynomial()
-        self.right_line.fit_polynomial()
+        self.left_line.fit_polynomial(self.ym_per_pix, self.xm_per_pix)
+        self.right_line.fit_polynomial(self.ym_per_pix, self.xm_per_pix)
 
         # Colors in the left and right lane regions
         out_img = self.left_line.color_pixels(out_img, [255, 0, 0])
@@ -107,7 +123,16 @@ class Lane():
         return out_img
 
     def previous_fits(self, binary_image):
-        logging.debug(f'lane => previous_fits')
+        """
+        Searches for the lane lines by:
+        - using the lane lines polygons from the previous frame
+        - add a margin around it
+        - try to fit a new polygon
+
+        :param binary_image: The binary input image
+
+        :return: image
+        """
 
         # Grab activated pixels
         nonzero = binary_image.nonzero()
@@ -126,30 +151,36 @@ class Lane():
         self.right_line.ally = nonzeroy[right_lane_inds]
 
         # fit polynomals
-        self.left_line.fit_polynomial()
-        self.right_line.fit_polynomial()
+        self.left_line.fit_polynomial(self.ym_per_pix, self.xm_per_pix)
+        self.right_line.fit_polynomial(self.ym_per_pix, self.xm_per_pix)
 
         # Create an image to draw on and an image to show the selection window
         out_img = np.dstack((binary_image, binary_image, binary_image))*255
         window_img = np.zeros_like(out_img)
 
         # Color in left and right line pixels
-        out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-        out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+        out_img = self.left_line.color_pixels(out_img, [255, 0, 0])
+        out_img = self.right_line.color_pixels(out_img, [0, 0, 255])
 
         # Generate a polygon to illustrate the search window area
         # And recast the x and y points into usable format for cv2.fillPoly()
-        left_line_pts = self.left_line.generate_polygon_points(self.margin)
-        right_line_pts = self.right_line.generate_polygon_points(self.margin)
+        left_line_pts = self.left_line.draw_search_polygon(self.margin, window_img, [255, 0, 0])
+        right_line_pts = self.right_line.draw_search_polygon(self.margin,  window_img, [0, 0, 255])
 
         # Draw the lane onto the warped blank image
-        cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
-        cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
-        result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+        return cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
 
-        return result
+    def draw(self, warped, undist, transform):
+        """
+        Draws the lane on the image:
 
-    def draw(self, image, warped, undist, transform):
+        :param warped: The transformed binary undistored image 
+        :param undist: The undistored image to draw on
+        :param transform: The transformation object (for inverse transformation)
+
+        :return: image
+        """
+
         # Create an image to draw the lines on
         warp_zero = np.zeros_like(warped).astype(np.uint8)
         color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
@@ -163,16 +194,68 @@ class Lane():
         cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
 
         # Warp the blank back to original image space using inverse perspective matrix (Minv)
-        newwarp = cv2.warpPerspective(color_warp, transform.inverse_matrix, (image.shape[1], image.shape[0])) 
+        newwarp = cv2.warpPerspective(color_warp, transform.inverse_matrix, (undist.shape[1], undist.shape[0])) 
         
         # Combine the result with the original image
         return cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
 
+    def calculate_offset(self, binary_image):
+        """
+        Calculates the offset to the center
+        - by looking in the bottom window
+        - and collecting all the x values 
+        - calculate an average per line
+        - determine the center of the lane
+        - determine the center of the frame
+        - calculating the (absolute) offset between the centers
+
+        :param binary_image: The transformed binary undistored image 
+
+        :return: integer
+        """
+
+        # Set height of windows - based on nwindows above and image shape
+        window_height = np.int(binary_image.shape[0] // self.nwindows)
+
+        # get the bottom window
+        bottom_window = binary_image.shape[0] - window_height
+
+        # get an average of all x values in the bottom window
+        left_line_x_bottom = np.mean(self.left_line.allx[self.left_line.ally >= bottom_window])
+        right_line_x_bottom = np.mean(self.right_line.allx[self.right_line.ally >= bottom_window])
+        
+        # determine the center of the lane
+        lane_center = left_line_x_bottom + (right_line_x_bottom - left_line_x_bottom) / 2
+        
+        # determine the frame center
+        frame_center = binary_image.shape[1] / 2
+
+        # calculate the offset
+        return abs(lane_center - frame_center) * self.xm_per_pix
 
     def detect_lines(self, binary_image):
+        """
+        Detects the lines in the given image
+        - collects the lane curvature
+        - collects the offset
+
+        :param binary_image: The transformed binary undistored image 
+
+        :return: image, float, integer
+        """
+
         if self.left_line.detected and self.right_line.detected:
             out_img = self.previous_fits(binary_image)
         else:
             out_img = self.sliding_windows(binary_image)
 
-        return out_img
+        # calculate the curvature
+        curvature = np.mean([
+            self.left_line.radius_of_curvature,
+            self.right_line.radius_of_curvature
+        ])
+
+        # calculate the offset
+        offset = self.calculate_offset(binary_image)
+
+        return out_img, curvature, offset

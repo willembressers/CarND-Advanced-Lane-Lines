@@ -49,6 +49,8 @@ class Video():
         """
         Get the next frame
 
-        :return: boolean, frame
+        :return: boolean, frame, id
         """
-        return self.capture.read()
+        ret, frame = self.capture.read()
+        id = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
+        return ret, frame, id

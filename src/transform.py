@@ -21,7 +21,7 @@ class Transform:
         self.height = height
 
         # Source points
-        src = np.float32([[546, 460], [732, 460], [width, height-10], [0, height-10]])
+        src = np.float32([[546, 450], [732, 450], [width, height-10], [0, height-10]])
 
         # Destination points
         dst = np.float32([[0, 0], [width, 0], [width, height], [0, height]])

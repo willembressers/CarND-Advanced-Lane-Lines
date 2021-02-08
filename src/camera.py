@@ -8,17 +8,21 @@ import cv2
 import numpy as np
 
 class Camera:
-    matrix_file = "camera_matrix.pkl"
+    matrix_file = "matrix.pkl"
 
-    def __init__(self, image_size):
+    def __init__(self, image_size, directory='calibration', chessboard_pattern=(9, 6)):
         """
         Initializes the camera
 
         :param image_size: Whats the size (width, height) of the image?
+        :param directory: Where is the directory of the chessboard images?
+        :param chessboard_pattern: What chessboard pattern size is used?
 
         :return: None
         """
         logging.debug(f'Initializing the camera')
+        self.directory = directory
+        self.chessboard_pattern = chessboard_pattern
 
         # check if the camera_matrix exists
         if not os.path.exists(self.matrix_file):
@@ -42,9 +46,10 @@ class Camera:
         :return None
         """
         logging.debug(f'Loading camera matrix')
+        path = os.path.join(self.directory, self.matrix_file)
 
         # Read in the camera calibration matrix
-        dist_pickle = pickle.load(open(self.matrix_file, "rb"))
+        dist_pickle = pickle.load(open(path, "rb"))
         object_points = dist_pickle["object_points"]
         image_points = dist_pickle["image_points"]
 
@@ -54,49 +59,48 @@ class Camera:
         self.camera_matrix = camera_matrix
         self.distortion_coefficients = distortion_coefficients
 
-
-    def generate_calibration_matrix(self, directory='camera_cal', chessboard_pattern=(9, 6)):
+    def generate_calibration_matrix(self):
         """
         Generate the camera calibration matrix + distorion coefficients
         and stores it in a pickle file
 
-        :param directory: Where is the directory of the chessboard images?
-        :param chessboard_pattern: What chessboard pattern size is used?
-
         :return: None
         """
         logging.debug(f'Camera matrix not found, generating...')
+        path = os.path.join(self.directory, self.matrix_file)
 
         # prepare object points
-        points = np.zeros((chessboard_pattern[0] * chessboard_pattern[1], 3), np.float32)
-        points[:, :2] = np.mgrid[0:chessboard_pattern[0], 0:chessboard_pattern[1]].T.reshape(-1, 2)
+        points = np.zeros((self.chessboard_pattern[0] * self.chessboard_pattern[1], 3), np.float32)
+        points[:, :2] = np.mgrid[0:self.chessboard_pattern[0], 0:self.chessboard_pattern[1]].T.reshape(-1, 2)
 
         # Arrays to store object points and image points from all the images.
         object_points = []
         image_points = []
 
         # loop over files in the directory
-        for file in os.listdir(directory):
+        for file in os.listdir(self.directory):
 
-            file_path = os.path.join(directory, file)
-            logging.debug(f'Finding corners @ {file_path}')
+            if file.endswith((".jpg")):
 
-            # read the image
-            image = cv2.imread(file_path)
+                file_path = os.path.join(self.directory, file)
+                logging.debug(f'Finding corners @ {file_path}')
 
-            # convert to grayscale
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                # read the image
+                image = cv2.imread(file_path)
 
-            # Find the chessboard corners
-            ret, corners = cv2.findChessboardCorners(gray, chessboard_pattern, None)
+                # convert to grayscale
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-            # If found, add object points, image points
-            if ret == True:
-                object_points.append(points)
-                image_points.append(corners)
+                # Find the chessboard corners
+                ret, corners = cv2.findChessboardCorners(gray, self.chessboard_pattern, None)
+
+                # If found, add object points, image points
+                if ret == True:
+                    object_points.append(points)
+                    image_points.append(corners)
 
         # Save the camera calibration result for later use
         pickle.dump({
             "object_points":object_points, 
             "image_points":image_points
-        }, open(self.matrix_file, "wb"))
+        }, open(path, "wb"))

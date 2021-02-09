@@ -1,6 +1,8 @@
 # Advanced Lane Finding
 
-[![Project video (easy)](https://img.youtube.com/vi/vn48abobflA/0.jpg)](https://www.youtube.com/watch?v=vn48abobflA)
+[![Project video (easy)](https://img.youtube.com/vi/vn48abobflA/0.jpg)](https://www.youtube.com/watch?v=vn48abobflA) 
+
+*click on the image to play the video*
 
 ## Project Organization
 
@@ -252,3 +254,11 @@ image = picture_in_picture(image, dataworkz, boxes[4], 4)
 ```
 
 <img src="./data/processed/output_images/straight_lines1.jpg" alt="straight_lines1" width="600"/>
+
+## Discussion
+There are many flaws in this code, and i think i know how to fix them. But the deadline of this project is tomorrow. so instead of solving them i mention them. 
+- currently only the first frame applies `sliding_windows` and all consecutive frames apply the `previous_fits` approach, because the line.detected is set to `True` and never set to `False`. I've had trouble figuring out when and how to set them to `false`.
+- I've tried to set the top of the `src` vertices for the warping higher, so i could look futher ahead. I hoped to find more stable lines in the different video's but the lines ended up more unstable.
+- i don't know how i would approach the very tight bend in the `harder_challenge_video.mp4` video. I think the `sliding_windows` doesn't work, the `previous_fits` should be more suitable. but the warp matrix will crop the image to much (i think) to get the pixels.
+
+i realy wanted to go above and beyound at this project. but there is so much ahead that i leave it at this. (for now)

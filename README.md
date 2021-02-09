@@ -1,26 +1,34 @@
-## Advanced Lane Finding
+# Advanced Lane Finding
 
-<p align="center">
- <a href="https://www.youtube.com/embed/vn48abobflA"></a>
-</p>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/vn48abobflA" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
+## Project Organization
 
-[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
-![Lanes Image](./examples/example_output.jpg)
+    ├── README.md          <- The top-level README for developers using this project.
+    ├── data
+    │   ├── external       <- Data from third party sources.
+    │   ├── interim        <- Intermediate data that has been transformed.
+    │   ├── processed      <- The final, canonical data sets for modeling.
+    │   └── raw            <- The original, immutable data dump.
+    │
+    ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
+    │                         generated with `pip freeze > requirements.txt`
+    │
+    └── src                <- Source code for use in this project.
 
-In this project, your goal is to write a software pipeline to identify the lane boundaries in a video, but the main output or product we want you to create is a detailed writeup of the project.  Check out the [writeup template](https://github.com/udacity/CarND-Advanced-Lane-Lines/blob/master/writeup_template.md) for this project and use it as a starting point for creating your own writeup.  
+## Installation
+I suggest to create an new virtual (python) environment with `mkvirtualenv`, and then install the dependencies with.
+```bash
+pip install -r requirements.txt
+```
 
-Creating a great writeup:
----
-A great writeup should include the rubric points as well as your description of how you addressed each point.  You should include a detailed description of the code used in each step (with line-number references and code snippets where necessary), and links to other supporting documents or external references.  You should include images in your writeup to demonstrate how your code works with examples.  
+## Usage
+Run the python file `src/find_lane_lines.py`. It requires an input path which can be a video or image. In the `data/raw/` are some `test_videos` and `test_images`. You can use the flag `-v, --verbose` to let the application be more explicit. You can use the flag `-s, --show` to show the live process on video's.
+```bash
+python src/find_lane_lines.py data/raw/test_videos/project_video.mp4 -s -v
+```
 
-All that said, please be concise!  We're not looking for you to write a book here, just a brief description of how you passed each rubric point, and references to the relevant code :). 
-
-You're not required to use markdown for your writeup.  If you use another method please just submit a pdf of your writeup.
-
-The Project
----
-
+## Project description
 The goals / steps of this project are the following:
 
 * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
@@ -32,14 +40,94 @@ The goals / steps of this project are the following:
 * Warp the detected lane boundaries back onto the original image.
 * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
-The images for camera calibration are stored in the folder called `camera_cal`.  The images in `test_images` are for testing your pipeline on single frames.  If you want to extract more test images from the videos, you can simply use an image writing method like `cv2.imwrite()`, i.e., you can read the video in frame by frame as usual, and for frames you want to save for later you can write to an image file.  
+### Camera calibration
+Before the application applies the `processing pipeline` to the image or video it checks attempts to load the camera calibration matrix. If the matrix is not available, it will generate one based on the images in `data/raw/calibration`.
+```python
+# check if the camera_matrix exists
+if not os.path.exists(self.matrix_file):
+    self.generate_calibration_matrix()
 
-To help the reviewer examine your work, please save examples of the output from each stage of your pipeline in the folder called `output_images`, and include a description in your writeup for the project of what each image shows.    The video called `project_video.mp4` is the video your pipeline should work well on.  
+# load the calibration matrix
+self.load_calibration_matrix(image_size)
+```
 
-The `challenge_video.mp4` video is an extra (and optional) challenge for you if you want to test your pipeline under somewhat trickier conditions.  The `harder_challenge.mp4` video is another optional challenge and is brutal!
+### Pipeline
+Now we can apply the same pipeline on an image or every frame in an video.
+```python
+# Distortion correction
+undist = camera.undistort(image)
 
-If you're feeling ambitious (again, totally optional though), don't stop there!  We encourage you to go out and take video of your own, calibrate your camera and show us how you would implement this project from scratch!
+# Color/gradient threshold
+thresholded = threshold.color_and_gradient(undist)
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+# Perspective transform
+warped = transform.perspective(thresholded)
 
+# Detect lane lines
+lines, curvature, offset = lane.detect_lines(warped)
+
+# draw the lane
+output = lane.draw(warped, undist, transform)
+
+# enrich the frame
+output = enrich(output, curvature, offset, thresholded, warped, lines)
+```
+
+#### Distortion correction
+The distorion correction will apply the camera matrix on every image, which will correct for any camera distortions.
+```python
+cv2.undistort(image, self.camera_matrix, self.distortion_coefficients, None, None)
+```
+
+#### Color/gradient threshold
+First i'll convert the image from `RGB` formal to `HLS` format. Now i can use the `saturation` channel to create an binary image with all zero's except for the pixels where the saturation lays within my thresholds.
+```python
+# Convert to HLS color space and separate the V channel
+hls = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+s_channel = hls[:,:,2]
+
+# Threshold color channel
+color_binary = np.zeros_like(s_channel)
+color_binary[(s_channel >= self.color_threshold[0]) & (s_channel <= self.color_threshold[1])] = 1
+```
+
+Since i've allready converted the image to the `HLS` format, i can use the `lightness` channel as input for my (sobel) horizontal edge detector. Now i can create an binary image with all zero's except for the pixels where there is an edge. 
+```python
+l_channel = hls[:,:,1]
+
+# Sobel x
+sobelx = cv2.Sobel(l_channel, cv2.CV_64F, 1, 0) # Take the derivative in x
+abs_sobelx = np.absolute(sobelx) # Absolute x derivative to accentuate lines away from horizontal
+scaled_sobel = np.uint8(255 * abs_sobelx / np.max(abs_sobelx))
+
+# Threshold x gradient
+gradient_binary = np.zeros_like(scaled_sobel)
+gradient_binary[(scaled_sobel >= self.gradient_threshold[0]) & (scaled_sobel <= self.gradient_threshold[1])] = 1
+```
+
+Now i combine the 2 binary images to 1 binary image, which highlights bright colors and edges.
+```python
+# Combine the two binary thresholds
+combined_binary = np.zeros_like(gradient_binary)
+combined_binary[(color_binary == 1) | (gradient_binary == 1)] = 255
+```
+
+#### Perspective transform
+```python
+
+```
+
+#### Detect lane lines
+```python
+
+```
+
+#### draw the lane
+```python
+
+```
+
+#### enrich the frame
+```python
+
+```

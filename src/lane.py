@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 # custom packages
-from src.line import Line
+from line import Line
 
 class Lane():
 

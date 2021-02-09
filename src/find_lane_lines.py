@@ -8,11 +8,11 @@ import click
 import numpy as np
 
 # custom packages
-from src.lane import Lane
-from src.video import Video
-from src.camera import Camera
-from src.threshold import Threshold
-from src.transform import Transform
+from lane import Lane
+from video import Video
+from camera import Camera
+from threshold import Threshold
+from transform import Transform
 
 @click.command()
 @click.argument('path', type=click.Path(exists=True))
@@ -72,7 +72,7 @@ def process_image(file_name, path, show):
     output = pipeline(image, camera, threshold, transform, lane)
 
     # save the output
-    cv2.imwrite(f'output_images/{file_name}.jpg', output)
+    cv2.imwrite(f'data/processed/output_images/{file_name}.jpg', output)
 
 
 def process_video(file_name, path, show):
@@ -93,7 +93,7 @@ def process_video(file_name, path, show):
     transform = Transform(width=video.width, height=video.height)
 
     # define the output video
-    out = cv2.VideoWriter(f'output_videos/{file_name}.avi', cv2.VideoWriter_fourcc('M','J','P','G'), video.fps, (video.width, video.height))
+    out = cv2.VideoWriter(f'data/processed/output_videos/{file_name}.avi', cv2.VideoWriter_fourcc('M','J','P','G'), video.fps, (video.width, video.height))
 
     # loop over all frames
     while(video.has_frame()):
@@ -290,5 +290,5 @@ def pipeline(image, camera, threshold, transform, lane):
 
 if __name__ == '__main__':
     # read company logo
-    dataworkz = cv2.imread('dw.png', cv2.IMREAD_UNCHANGED)
+    dataworkz = cv2.imread('data/external/dw.png', cv2.IMREAD_UNCHANGED)
     main()

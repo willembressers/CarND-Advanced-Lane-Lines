@@ -8,9 +8,10 @@ import cv2
 import numpy as np
 
 class Camera:
-    matrix_file = "matrix.pkl"
+    matrix_file = "data/processed/matrix.pkl"
+    training_directory = "data/raw/calibration"
 
-    def __init__(self, image_size, directory='calibration', chessboard_pattern=(9, 6)):
+    def __init__(self, image_size, chessboard_pattern=(9, 6)):
         """
         Initializes the camera
 
@@ -21,7 +22,6 @@ class Camera:
         :return: None
         """
         logging.debug(f'Initializing the camera')
-        self.directory = directory
         self.chessboard_pattern = chessboard_pattern
 
         # check if the camera_matrix exists
@@ -46,10 +46,9 @@ class Camera:
         :return None
         """
         logging.debug(f'Loading camera matrix')
-        path = os.path.join(self.directory, self.matrix_file)
 
         # Read in the camera calibration matrix
-        dist_pickle = pickle.load(open(path, "rb"))
+        dist_pickle = pickle.load(open(self.matrix_file, "rb"))
         object_points = dist_pickle["object_points"]
         image_points = dist_pickle["image_points"]
 
@@ -67,7 +66,6 @@ class Camera:
         :return: None
         """
         logging.debug(f'Camera matrix not found, generating...')
-        path = os.path.join(self.directory, self.matrix_file)
 
         # prepare object points
         points = np.zeros((self.chessboard_pattern[0] * self.chessboard_pattern[1], 3), np.float32)
@@ -78,11 +76,11 @@ class Camera:
         image_points = []
 
         # loop over files in the directory
-        for file in os.listdir(self.directory):
+        for file in os.listdir(self.training_directory):
 
             if file.endswith((".jpg")):
 
-                file_path = os.path.join(self.directory, file)
+                file_path = os.path.join(self.training_directory, file)
                 logging.debug(f'Finding corners @ {file_path}')
 
                 # read the image
@@ -103,4 +101,4 @@ class Camera:
         pickle.dump({
             "object_points":object_points, 
             "image_points":image_points
-        }, open(path, "wb"))
+        }, open(self.matrix_file, "wb"))
